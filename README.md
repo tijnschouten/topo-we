@@ -33,7 +33,7 @@ npm run build
 
 ## GitHub Pages
 
-- `vite.config.ts` gebruikt `base: '/topo_we/'`
+- `vite.config.ts` gebruikt `base: '/topo-we/'`
 - Workflow in `.github/workflows/deploy.yml` deployt automatisch vanaf `main`
 
 Na activatie van GitHub Pages in repository settings wordt de app gepubliceerd via de Pages URL van deze repo.
