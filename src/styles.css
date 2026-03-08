@@ -1,0 +1,381 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+:root {
+  --ink: #17304d;
+  --sky: #9fd3ff;
+  --ocean: #66afe0;
+  --paper: #f7fbff;
+  --accent: #ff7b2f;
+  --ok: #1d8f5f;
+  --error: #b13a48;
+  --panel: #ffffff;
+  --shadow: 0 16px 36px rgba(16, 53, 88, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Nunito', sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 15%, rgba(255, 255, 255, 0.7), transparent 40%),
+    radial-gradient(circle at 85% 35%, rgba(218, 238, 255, 0.8), transparent 45%),
+    linear-gradient(150deg, #60a9df 0%, #7bc3f7 40%, #bde4ff 100%);
+  min-height: 100vh;
+}
+
+button,
+input,
+label {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 3px solid #0f4d82;
+  outline-offset: 2px;
+}
+
+.app-shell {
+  width: min(1200px, 94vw);
+  margin: 2rem auto 3rem;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.app-header {
+  background: linear-gradient(90deg, #0a4f87, #106ca8);
+  color: #fff;
+  border-radius: 18px;
+  padding: 1.1rem 1.3rem;
+  box-shadow: var(--shadow);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.04em;
+  font-size: clamp(1.8rem, 2.8vw, 2.4rem);
+}
+
+.app-header p {
+  margin: 0.3rem 0 0;
+  opacity: 0.95;
+}
+
+.card {
+  background: var(--panel);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.setup-card,
+.result-card {
+  padding: 1.2rem;
+}
+
+.setup-card h2,
+.result-card h2,
+.prompt-box h2 {
+  margin: 0 0 0.6rem;
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.03em;
+  color: #0d548f;
+}
+
+.setting-group + .setting-group {
+  margin-top: 1rem;
+}
+
+.setting-label {
+  margin: 0 0 0.45rem;
+  font-weight: 700;
+}
+
+.mode-grid,
+.category-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.mode-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.category-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.mode-option,
+.category-option {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  background: #eef7ff;
+  padding: 0.65rem 0.75rem;
+  border-radius: 11px;
+  border: 1px solid #d3e9ff;
+}
+
+.setup-footer,
+.result-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.best-score {
+  margin: 0;
+  font-weight: 700;
+}
+
+.cta-button,
+.ghost-button,
+.choice-button {
+  border: 0;
+  cursor: pointer;
+  border-radius: 11px;
+  padding: 0.62rem 0.9rem;
+  font-weight: 700;
+}
+
+.cta-button {
+  background: linear-gradient(135deg, #ff8a3d, #ff6a2e);
+  color: #fff;
+}
+
+.ghost-button {
+  background: #eaf4ff;
+  color: #11528b;
+}
+
+.error-text {
+  color: var(--error);
+  font-weight: 700;
+  margin-bottom: 0;
+}
+
+.play-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 1rem;
+}
+
+.status-card {
+  padding: 1rem;
+}
+
+.meta-row {
+  margin: 0.25rem 0;
+}
+
+.prompt-box {
+  background: #ecf7ff;
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.prompt-box p {
+  margin: 0.3rem 0;
+}
+
+.hint-hotkey {
+  color: #135384;
+  font-size: 0.95rem;
+}
+
+.choices {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.choice-button {
+  background: #e8f2ff;
+  color: #143f6b;
+  text-align: left;
+}
+
+.choice-button:disabled {
+  opacity: 0.8;
+  cursor: default;
+}
+
+.feedback-box {
+  margin-top: 0.9rem;
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.feedback-box.ok {
+  background: rgba(29, 143, 95, 0.15);
+  border: 1px solid rgba(29, 143, 95, 0.45);
+}
+
+.feedback-box.wrong {
+  background: rgba(177, 58, 72, 0.12);
+  border: 1px solid rgba(177, 58, 72, 0.45);
+}
+
+.feedback-box p {
+  margin: 0 0 0.45rem;
+}
+
+.hint-text {
+  color: #1c496f;
+}
+
+.map-card {
+  padding: 0.7rem;
+  overflow: hidden;
+}
+
+.topo-map {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  border: 2px solid #c5e2ff;
+  background: #7ec4f2;
+}
+
+.sea-bg {
+  fill: #7ec4f2;
+}
+
+.target {
+  transition: fill 160ms ease, stroke 160ms ease, transform 160ms ease;
+  cursor: pointer;
+}
+
+.context-country {
+  fill: #edf4fb;
+  stroke: #7ea7c9;
+  stroke-width: 1.2;
+}
+
+.focus-country {
+  fill: #f8fcff;
+  stroke: #2f5f8c;
+  stroke-width: 1.7;
+}
+
+.area {
+  fill: rgba(21, 78, 122, 0.08);
+  stroke: rgba(21, 78, 122, 0.34);
+  stroke-width: 1.4;
+}
+
+.point {
+  fill: #112f4f;
+  stroke: #fff;
+  stroke-width: 2;
+}
+
+.river-line {
+  fill: none;
+  stroke: rgba(47, 111, 160, 0.85);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.state-highlight {
+  fill: rgba(255, 174, 82, 0.55);
+  stroke: #ac4f07;
+  stroke-width: 3;
+}
+
+.point.state-highlight {
+  fill: #ff8d3c;
+}
+
+.state-correct {
+  fill: rgba(29, 143, 95, 0.55);
+  stroke: #0b6e44;
+  stroke-width: 3;
+}
+
+.point.state-correct {
+  fill: #0f8a57;
+}
+
+.state-wrong {
+  fill: rgba(177, 58, 72, 0.45);
+  stroke: #8c1f2d;
+  stroke-width: 3;
+}
+
+.point.state-wrong {
+  fill: #b13a48;
+}
+
+.river-line.state-highlight {
+  stroke: #cc6c1c;
+  stroke-width: 3;
+}
+
+.river-line.state-correct {
+  stroke: #137448;
+  stroke-width: 3;
+}
+
+.river-line.state-wrong {
+  stroke: #9c2534;
+  stroke-width: 3;
+}
+
+.target:hover {
+  transform: translateY(-1px);
+}
+
+.final-score {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0.25rem 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.8rem;
+}
+
+.category-stat {
+  margin: 0;
+  background: #edf7ff;
+  border: 1px solid #d2e9ff;
+  border-radius: 11px;
+  padding: 0.6rem;
+}
+
+.category-stat h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0e4e82;
+}
+
+.category-stat p {
+  margin: 0.25rem 0 0;
+}
+
+@media (max-width: 960px) {
+  .play-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .status-card {
+    order: 2;
+  }
+
+  .map-card {
+    order: 1;
+  }
+}
