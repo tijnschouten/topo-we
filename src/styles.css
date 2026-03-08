@@ -367,15 +367,57 @@ input:focus-visible {
 }
 
 @media (max-width: 960px) {
+  .app-shell {
+    margin: 0.7rem auto 1rem;
+    gap: 0.6rem;
+  }
+
+  .app-header.app-header-compact {
+    padding: 0.55rem 0.75rem;
+    border-radius: 12px;
+  }
+
+  .app-header.app-header-compact h1 {
+    font-size: clamp(1.35rem, 5.8vw, 1.8rem);
+    line-height: 1.05;
+  }
+
   .play-layout {
     grid-template-columns: 1fr;
+    gap: 0.55rem;
   }
 
   .status-card {
-    order: 2;
+    order: 1;
+    padding: 0.65rem 0.7rem;
   }
 
   .map-card {
-    order: 1;
+    order: 2;
+    padding: 0.45rem;
+  }
+
+  .meta-row {
+    margin: 0.1rem 0;
+    font-size: 0.98rem;
+  }
+
+  .prompt-box {
+    margin-top: 0.45rem;
+    padding: 0.55rem;
+  }
+
+  .prompt-box h2 {
+    margin-bottom: 0.35rem;
+  }
+
+  .choices {
+    margin-top: 0.55rem;
+    gap: 0.4rem;
+  }
+
+  .feedback-box {
+    margin-top: 0.55rem;
+    padding: 0.6rem;
   }
 }

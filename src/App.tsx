@@ -168,9 +168,11 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <header className="app-header">
+      <header className={`app-header ${stage === 'playing' ? 'app-header-compact' : ''}`}>
         <h1>Topo Trainer: West-Europa</h1>
-        <p>Leer landen, plaatsen, wateren en gebieden met directe feedback.</p>
+        {stage !== 'playing' && (
+          <p>Leer landen, plaatsen, wateren en gebieden met directe feedback.</p>
+        )}
       </header>
 
       {stage === 'setup' && (
