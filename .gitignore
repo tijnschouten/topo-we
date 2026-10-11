@@ -7,3 +7,4 @@ public/geo/
 .venv/
 __pycache__/
 *.pyc
+.cache/

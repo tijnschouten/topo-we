@@ -17,6 +17,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,14 +33,25 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache geography sources and prepared maps
+        uses: actions/cache@v4
+        with:
+          path: |
+            .cache/topo-geo
+            public/geo
+            src/data/referenceCatalog.json
+          key: geography-${{ runner.os }}-${{ hashFiles('scripts/prepare_geo.py', 'scripts/geo-requirements.txt') }}
+          restore-keys: |
+            geography-${{ runner.os }}-
+
       - name: Prepare source geometries
         run: |
           pip install -r scripts/geo-requirements.txt
-          npm run prepare:geo
+          npm run prepare:geo -- --cache-dir .cache/topo-geo
           npm run test:geo
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Test
         run: npm test

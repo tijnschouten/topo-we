@@ -57,7 +57,7 @@ De uitsnede volgt de set. Europese sets met meerdere landen en Rusland openen op
 
 ## GitHub Pages en Railway
 
-Er is nog steeds geen applicatiebackend nodig: geodata wordt tijdens de build voorbereid en samen met de app gepubliceerd. Hierdoor zijn de oefensessies niet afhankelijk van live GIS-zoekdiensten. De GitHub Pages-workflow bereidt de bronnen voor en publiceert `dist/`, met basis `/topo-we/`.
+Er is nog steeds geen applicatiebackend nodig: geodata wordt tijdens de build voorbereid en samen met de app gepubliceerd. Hierdoor zijn de oefensessies niet afhankelijk van live GIS-zoekdiensten. De GitHub Pages-workflow bereidt de bronnen voor en publiceert `dist/`, met basis `/topo-we/`. De build bewaart bronbestanden en voorbereide kaarten in een Actions-cache. De grote IHO-bron wordt als gecomprimeerde momentopname uit de GitHub-release `geo-sources-v1` opgehaald, met dezelfde oorspronkelijke SHA-256-controle; Marine Regions blijft de bron. Downloads melden voortgang en stoppen bij een netwerkstilstand of na tien minuten.
 
 De meegeleverde Dockerfile bouwt de geodata in een Python-stage en de app in een Node-stage. Railway kan deze rechtstreeks bouwen. Nginx serveert de productiebuild en bronbestanden op `${PORT}` (standaard 8080); gezondheidstest `/`. De eerste Dockerbuild downloadt/converteert de bronnen; latere builds kunnen de geodata-stage hergebruiken. De app gebruikt op Railway de basis `/`.
 

@@ -9,6 +9,7 @@ import hashlib
 import json
 import math
 import os
+import time
 from pathlib import Path
 import urllib.request
 import zipfile
@@ -28,6 +29,9 @@ SOURCES = {
     'gmba_broad': ('https://data.earthenv.org/mountains/broad/GMBA_Inventory_v2.0_broad.zip', '5840914988bbb9cb31fb0881262ad206895d95d361f7929da67f3984cb6c1c72'),
     'gmba': ('https://data.earthenv.org/mountains/standard/GMBA_Inventory_v2.0_standard.zip', '3d67de8143beba5ce427cb2c3041194079fe070b371ac0a2bce91f3bc62d9d27'),
 }
+SOURCE_SNAPSHOTS = {
+    'iho': 'https://github.com/tijnschouten/topo-we/releases/download/geo-sources-v1/topo-iho-source.json.gz',
+}
 ALIASES = {'Rhine': ['Rijn'], 'Thames': ['Theems'], 'Danube': ['Donau'], 'Schelde': ['Schelde', 'Scheldt'], 'Rhône': ['Rhône', 'Rhone'], 'Seine': ['Seine'], 'Amazonas': ['Amazone', 'Amazon'], 'Amazon': ['Amazone', 'Amazonas'], 'Nile': ['Nijl'], 'European Alps': ['Alpen'], 'Pyrenees': ['Pyreneeën', 'Pyreneeen'], 'Ardennes': ['Ardennen'], 'Himalaya': ['Himalaya', 'Himalayas'], 'Andes': ['Andes'], 'Rocky Mountains': ['Rocky Mountains'], 'Carpathians': ['Karpaten'], 'Atlas Mountains': ['Atlas'], 'Ural Mountains': ['Oeral']}
 ALIASES.update({'Volga':['Wolga'], 'Ural':['Oeral'], 'Caucasus':['Kaukasus'], 'Greater Caucasus':['Grote Kaukasus','Kaukasus']})
 CITY_COUNTRIES = {"Dublin":"Ireland", "Londen":"United Kingdom", "Glasgow":"United Kingdom", "Liverpool":"United Kingdom", "Amsterdam":"Netherlands", "Brussel":"Belgium", "Antwerpen":"Belgium", "Luxemburg":"Luxembourg", "Berlijn":"Germany", "Hamburg":"Germany", "Keulen":"Germany", "München":"Germany", "Parijs":"France", "Lyon":"France", "Bordeaux":"France", "Marseille":"France"}
@@ -41,13 +45,25 @@ def download(cache, key):
     url, expected = SOURCES[key]
     path = cache / (key + ('.zip' if key.startswith('gmba') else '.json'))
     if not path.exists():
-        print('Downloading', key, flush=True)
-        request = urllib.request.Request(url, headers={'User-Agent': 'TopoTrainer-source-build/1.0'})
+        download_url = SOURCE_SNAPSHOTS.get(key, url)
+        print('Downloading', key, '(compressed snapshot)' if key in SOURCE_SNAPSHOTS else '', flush=True)
+        request = urllib.request.Request(download_url, headers={'User-Agent': 'TopoTrainer-source-build/1.0'})
         temp = path.with_suffix('.download')
         try:
-            with urllib.request.urlopen(request, timeout=120) as source, temp.open('wb') as target:
+            started = time.monotonic()
+            received = 0
+            next_report = 16 * 1024 * 1024
+            with urllib.request.urlopen(request, timeout=30) as source, temp.open('wb') as target:
                 while chunk := source.read(1024 * 1024):
                     target.write(chunk)
+                    received += len(chunk)
+                    if time.monotonic() - started > 600:
+                        raise TimeoutError(f'{key}: download exceeded 10 minutes')
+                    if received >= next_report:
+                        print(f'{key}: {received / 1024 / 1024:.0f} MiB downloaded', flush=True)
+                        next_report = received + 16 * 1024 * 1024
+            if key in SOURCE_SNAPSHOTS:
+                temp.write_bytes(gzip.decompress(temp.read_bytes()))
             if key == 'iho':
                 # WFS includes a request timestamp. Pin semantic source content,
                 # excluding only response metadata; preserve every original feature.
@@ -56,7 +72,10 @@ def download(cache, key):
                     raise ValueError('Incomplete IHO source response')
                 features = sorted(data['features'], key=lambda f:f['properties']['mrgid'])
                 temp.write_text(json.dumps({'type':'FeatureCollection','features':features}, sort_keys=True, separators=(',',':'), ensure_ascii=False))
+            if hashlib.sha256(temp.read_bytes()).hexdigest() != expected:
+                raise ValueError(f'{key}: source checksum changed; inspect the new release before updating.')
             temp.rename(path)
+            print(f'{key}: downloaded and checksum verified', flush=True)
         finally:
             temp.unlink(missing_ok=True)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
