@@ -2,6 +2,7 @@ import { feature } from "topojson-client";
 import { geoArea } from "d3-geo";
 import topology from "world-atlas/countries-50m.json";
 import references from "./referenceCatalog.json";
+import europaSet from "./europaSet.json";
 import type { TopoItem } from "../types";
 // The 50m layer is visual context only; all answer targets use their source files.
 export const countries = (
@@ -44,4 +45,6 @@ export function mainland(input: GeoJSON.Geometry): GeoJSON.Geometry {
   return result;
 }
 export const initialItems = references as unknown as TopoItem[];
-export const catalog = initialItems;
+export const catalog = [...initialItems, ...(europaSet.items as TopoItem[]).filter(
+  item => !initialItems.some(existing => existing.id === item.id),
+)];

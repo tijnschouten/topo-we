@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import App from "../App";
 import { mockSourceFiles } from "./sourceFixtures";
 import { initialItems } from "../data/catalog";
+import europaSet from "../data/europaSet.json";
 import { saveSet, loadSet } from "../utils/sets";
 import { createSetLink } from "../utils/shareSet";
 
@@ -27,6 +28,20 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); history.replaceState(null, "", "/"); });
 describe("App flow", () => {
+  it("start met de volledige Europa-standaardset en kan die opnieuw laden", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Europa");
+    expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
+    expect(container.querySelectorAll(".selected-list li, .selected-list .selected-item")).toHaveLength(54);
+    await user.click(screen.getByRole("button", { name: "Lege set" }));
+    await user.click(screen.getByRole("button", { name: "Standaard Europa laden" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    expect(loadSet()?.name).toBe("Europa");
+    expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
+  });
   it.each([false, true])("verwijdert achtergebleven objectfocus bij doorklikken op de kaart (ander object: %s)", async different => {
     const user = userEvent.setup();
     const { container } = render(<App />);

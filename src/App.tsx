@@ -3,7 +3,8 @@ import { capitalsForCountries, placeContext } from "./utils/places";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopoMap from "./components/TopoMap";
 import WorldSearch from "./components/WorldSearch";
-import { catalog, initialItems } from "./data/catalog";
+import { catalog } from "./data/catalog";
+import europaSet from "./data/europaSet.json";
 import { categoryLabels } from "./data/topoItems";
 import type { Category, QuizMode, QuizQuestion, TopoItem } from "./types";
 import { buildQuestions } from "./utils/quiz";
@@ -25,11 +26,7 @@ import {
 type Stage = "setup" | "playing" | "finished";
 const categories: Category[] = ["land", "plaats", "water", "gebied"];
 const symbols = { land: "▱", plaats: "●", water: "≈", gebied: "△" };
-const defaultSet: PracticeSet = {
-  version: 1,
-  name: "West-Europa",
-  items: initialItems,
-};
+const defaultSet = europaSet as PracticeSet;
 const modes: {
   id: QuizMode;
   title: string;
@@ -167,6 +164,20 @@ export default function App() {
   function dismissSharedSet() {
     setSharedSet(null);
     history.replaceState(null, "", window.location.pathname + window.location.search);
+  }
+  async function loadDefaultSet() {
+    if (sourceLoading) return;
+    setSourceLoading(true);
+    try {
+      const result = await hydrateSet(defaultSet.items);
+      if (result.unavailable.length) throw new Error(`Brongegevens ontbreken voor: ${result.unavailable.join(", ")}.`);
+      setSet({ ...defaultSet, items: result.items });
+      setEnabled(categories);
+      setCandidate(null);
+      setWorld(false);
+      setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Standaardset laden mislukt."); }
+    finally { setSourceLoading(false); }
   }
   async function openSharedSet() {
     if (!sharedSet || sourceLoading) return;
@@ -390,14 +401,9 @@ export default function App() {
               <div className="set-actions">
                 <button
                   disabled={sourceLoading}
-                  onClick={() => {
-                    setCandidate(null);
-                    setSet(defaultSet);
-
-                    setError("");
-                  }}
+                  onClick={() => void loadDefaultSet()}
                 >
-                  Voorbeeld laden
+                  Standaard Europa laden
                 </button>
                 <button
                   disabled={sourceLoading}

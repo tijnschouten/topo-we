@@ -1,5 +1,9 @@
 import { vi } from "vitest";
-import { initialItems } from "../data/catalog";
+import { catalog, initialItems } from "../data/catalog";
+const sourceItems = catalog.map(item => item.geometry ? item : {
+  ...item,
+  geometry: initialItems.find(example => example.categorie === item.categorie)!.geometry,
+});
 export function mockSourceFiles() {
   vi.stubGlobal(
     "fetch",
@@ -8,10 +12,10 @@ export function mockSourceFiles() {
       if (url.endsWith("/geo/index.json.gz"))
         return new Response(
           JSON.stringify(
-            initialItems.map(({ geometry: _g, ...metadata }) => metadata),
+            sourceItems.map(({ geometry: _g, ...metadata }) => metadata),
           ),
         );
-      const item = initialItems.find((i) =>
+      const item = sourceItems.find((i) =>
         url.endsWith(`/geo/${i.provenance?.file}`),
       );
       return item
