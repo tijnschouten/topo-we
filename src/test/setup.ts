@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom/vitest';
+import "@testing-library/jest-dom/vitest";
 
 const store = new Map<string, string>();
 
@@ -16,15 +16,18 @@ const localStorageMock: Storage = {
   key: (index: number) => Array.from(store.keys())[index] ?? null,
   get length() {
     return store.size;
-  }
+  },
 };
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   value: localStorageMock,
-  configurable: true
+  configurable: true,
 });
 
-Object.defineProperty(globalThis, 'localStorage', {
+Object.defineProperty(globalThis, "localStorage", {
   value: localStorageMock,
-  configurable: true
+  configurable: true,
 });
+
+// jsdom does not implement visual scrolling.
+HTMLElement.prototype.scrollIntoView = () => {};
