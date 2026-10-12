@@ -4,10 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import TopoMap from "./components/TopoMap";
 import WorldSearch from "./components/WorldSearch";
 import { catalog } from "./data/catalog";
-import europaSet from "./data/europaSet.json";
+import { standardSets } from "./data/standardSets";
 import { categoryLabels } from "./data/topoItems";
 import type { Category, QuizMode, QuizQuestion, TopoItem } from "./types";
-import { buildQuestions } from "./utils/quiz";
+import { buildQuestions, isCorrectAnswer } from "./utils/quiz";
 import {
   loadLibrary,
   resolveGeometry,
@@ -17,16 +17,18 @@ import {
 import { normalizeName } from "./utils/lookup";
 import {
   exportSet,
-  loadSet,
+  loadCollection,
+  newSavedSet,
   parseSet,
-  saveSet,
+  saveCollection,
+  type SavedSet,
   type PracticeSet,
 } from "./utils/sets";
 
 type Stage = "setup" | "playing" | "finished";
 const categories: Category[] = ["land", "plaats", "water", "gebied"];
 const symbols = { land: "▱", plaats: "●", water: "≈", gebied: "△" };
-const defaultSet = europaSet as PracticeSet;
+const defaultSet = standardSets[0];
 const modes: {
   id: QuizMode;
   title: string;
@@ -47,7 +49,15 @@ const modes: {
   },
 ];
 export default function App() {
-  const [set, setSet] = useState<PracticeSet>(() => loadSet() ?? defaultSet);
+  const [collection, setCollection] = useState(() => loadCollection(defaultSet));
+  const set = collection.sets.find(item => item.id === collection.activeId)!;
+  function setSet(update: PracticeSet | ((previous: SavedSet) => PracticeSet)) {
+    setCollection(previous => ({ ...previous, sets: previous.sets.map(item =>
+      item.id === previous.activeId ? { ...(typeof update === "function" ? update(item) : update), id: item.id } : item),
+    }));
+  }
+  const [setSearch, setSetSearch] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("setup");
   const [mode, setMode] = useState<QuizMode>("zoek-op-kaart");
   const [enabled, setEnabled] = useState<Category[]>(categories);
@@ -146,9 +156,9 @@ export default function App() {
   useEffect(() => {
     if (!sourceLoading)
       setSaveError(
-        !saveSet({ ...set, name: set.name.trim() || "Mijn oefenset" }),
+        !saveCollection(collection),
       );
-  }, [set, sourceLoading]);
+  }, [collection, sourceLoading]);
   useEffect(() => { setShareLink(""); setShareMessage(""); }, [set]);
   async function share() {
     let link: string;
@@ -165,19 +175,57 @@ export default function App() {
     setSharedSet(null);
     history.replaceState(null, "", window.location.pathname + window.location.search);
   }
-  async function loadDefaultSet() {
+  function resetSetView() {
+    setEnabled(categories);
+    setCandidate(null);
+    setWorld(false);
+    setPreviewCategory(undefined);
+    setCapitalMessage("");
+    setQuery("");
+    setFilter("all");
+    setDeleteId(null);
+    setError("");
+  }
+  function addSavedSet(incoming: PracticeSet) {
+    const saved = newSavedSet({ version: 1, name: incoming.name, items: incoming.items });
+    setCollection(previous => ({ ...previous, activeId: saved.id, sets: [...previous.sets, saved] }));
+    resetSetView();
+  }
+  async function selectSet(id: string) {
+    if (sourceLoading || id === collection.activeId) return false;
+    const chosen = collection.sets.find(item => item.id === id);
+    if (!chosen) return false;
+    setSourceLoading(true);
+    try {
+      const result = await hydrateSet(chosen.items);
+      setCollection(previous => ({ ...previous, activeId: id,
+        sets: previous.sets.map(item => item.id === id ? { ...item, items: result.items } : item),
+      }));
+      resetSetView();
+      if (result.unavailable.length) setError(`Brongegevens ontbreken voor: ${result.unavailable.join(", ")}. Verwijder deze locaties of zoek ze opnieuw op.`);
+      return true;
+    } catch (e) { setError(e instanceof Error ? e.message : "Set openen mislukt."); return false; }
+    finally { setSourceLoading(false); }
+  }
+  async function useStandardSet(template: PracticeSet) {
     if (sourceLoading) return;
     setSourceLoading(true);
     try {
-      const result = await hydrateSet(defaultSet.items);
+      const result = await hydrateSet(template.items);
       if (result.unavailable.length) throw new Error(`Brongegevens ontbreken voor: ${result.unavailable.join(", ")}.`);
-      setSet({ ...defaultSet, items: result.items });
-      setEnabled(categories);
-      setCandidate(null);
-      setWorld(false);
-      setError("");
+      addSavedSet({ ...template, items: result.items });
     } catch (e) { setError(e instanceof Error ? e.message : "Standaardset laden mislukt."); }
     finally { setSourceLoading(false); }
+  }
+  async function deleteSavedSet(id: string) {
+    if (sourceLoading) return;
+    if (id === collection.activeId) {
+      const next = collection.sets.find(item => item.id !== id);
+      if (next) { if (!await selectSet(next.id)) return; }
+      else addSavedSet({ version: 1, name: "Mijn oefenset", items: [] });
+    }
+    setCollection(previous => ({ ...previous, sets: previous.sets.filter(item => item.id !== id) }));
+    setDeleteId(null);
   }
   async function openSharedSet() {
     if (!sharedSet || sourceLoading) return;
@@ -185,7 +233,7 @@ export default function App() {
     try {
       const result = await hydrateSet(sharedSet.items);
       if (result.unavailable.length) throw new Error(`Brongegevens ontbreken voor: ${result.unavailable.join(", ")}.`);
-      setSet({ ...sharedSet, items: result.items });
+      addSavedSet({ ...sharedSet, items: result.items });
       setEnabled(categories);
       setCandidate(null);
       setError("");
@@ -215,7 +263,7 @@ export default function App() {
   }
   function answer(chosen?: TopoItem) {
     if (!current || feedback) return;
-    const correct = chosen?.id === current.item.id;
+    const correct = isCorrectAnswer(current.item, chosen, mode);
     setAnswers((a) => [...a, { item: current.item, correct }]);
     setFeedback({ correct, chosen });
   }
@@ -305,7 +353,7 @@ export default function App() {
         throw new Error(
           `Deze set bevat locaties zonder passende brongeometrie: ${hydrated.unavailable.join(", ")}.`,
         );
-      setSet({ ...imported, items: hydrated.items });
+      addSavedSet({ ...imported, items: hydrated.items });
       setError("");
 
       setEnabled(categories);
@@ -320,7 +368,7 @@ export default function App() {
     [stage, questions, set.items],
   );
   return (
-    <main className="app-shell" onClickCapture={e => {
+    <main className={`app-shell ${stage === "playing" ? "is-playing" : ""}`} onClickCapture={e => {
       if (stage !== "playing" || !feedback?.correct) return;
       // Map clicks run through its gesture filter. Keep controls working normally.
       if ((e.target as Element).closest(".topo-map, .map-tools, button, a, input, select, textarea, label, summary, [role=button]")) return;
@@ -355,7 +403,7 @@ export default function App() {
           {sharedSet && <section className="card shared-set-banner">
             <p className="eyebrow">EEN SET VOOR JOU</p>
             <h2>{sharedSet.name}</h2>
-            <p>{sharedSet.items.length} locaties om samen te oefenen. Je eigen set blijft bewaard totdat je deze opent.</p>
+            <p>{sharedSet.items.length} locaties om samen te oefenen. Deze wordt toegevoegd aan je oefensets; je eigen sets blijven bewaard.</p>
             <details><summary>Bekijk de locaties</summary><p>{sharedSet.items.map(i => i.naam).join(" · ")}</p></details>
             <div className="shared-set-actions">
               <button className="cta-button" disabled={sourceLoading} onClick={() => void openSharedSet()}>Deze set openen</button>
@@ -365,11 +413,11 @@ export default function App() {
           <section className="intro">
             <div>
               <p className="eyebrow">JOUW KAART. JOUW TEMPO.</p>
-              <h1>Waar wil je naartoe?</h1>
+              <h1>Wat wil je vandaag oefenen?</h1>
               <p>
                 Van de steden in je lesboek tot de rivieren van de wereld.
                 <br />
-                Stel je eigen kaart samen en ontdek hoeveel je al weet.
+                Kies een oefenset of maak een nieuwe kaart voor je volgende toets.
               </p>
             </div>
             <div className="intro-note">
@@ -380,6 +428,40 @@ export default function App() {
                 <strong>een beetje wijzer.</strong>
               </p>
             </div>
+          </section>
+          <section className="card sets-library" aria-label="Oefensets beheren">
+            <div className="sets-heading">
+              <div><p className="eyebrow">KIES JE KAART</p><h2>Mijn oefensets <span className="count">{collection.sets.length}</span></h2></div>
+              <button className="cta-button" disabled={sourceLoading} onClick={() => addSavedSet({ version: 1, name: "Mijn oefenset", items: [] })}>+ Nieuwe oefenset</button>
+            </div>
+            <input type="search" aria-label="Zoek oefensets" placeholder="Zoek in je oefensets…" value={setSearch} onChange={e => setSetSearch(e.target.value)} />
+            <div className="set-cards">
+              {collection.sets.filter(item => normalizeName(item.name).includes(normalizeName(setSearch))).map(item => (
+                <button key={item.id} className={`set-card ${item.id === set.id ? "active" : ""}`} aria-pressed={item.id === set.id}
+                  disabled={sourceLoading} onClick={() => void selectSet(item.id)}>
+                  <span className="set-card-tag">{item.id === set.id ? "✓ Geselecteerd" : "Eigen set"}</span>
+                  <strong>{item.name || "Mijn oefenset"}</strong>
+                  <small>{item.items.length} locaties · {categories.filter(c => item.items.some(i => i.categorie === c)).map(c => categoryLabels[c]).join(" · ") || "Nog geen locaties"}</small>
+                </button>
+              ))}
+            </div>
+            {!collection.sets.some(item => normalizeName(item.name).includes(normalizeName(setSearch))) && <p className="empty">Geen oefensets gevonden.</p>}
+            {deleteId && <div className="delete-set-confirm" role="alert">
+              <p>“{collection.sets.find(item => item.id === deleteId)?.name}” verwijderen uit deze browser?</p>
+              <button disabled={sourceLoading} onClick={() => void deleteSavedSet(deleteId)}>Ja, set verwijderen</button>
+              <button onClick={() => setDeleteId(null)}>Annuleren</button>
+            </div>}
+            <details className="standard-sets" open>
+              <summary>Standaard oefensets <span>Een kant-en-klare start voor je volgende toets</span></summary>
+              <div className="set-cards">
+                {standardSets.map(template => <article key={template.templateId} className="set-card template-card">
+                  <span className="set-card-tag">{template.templateId.startsWith("groep") ? "School · Groep 7" : "Ontdek Europa"}</span>
+                  <h3>{template.name}</h3><p>{template.description}</p><small>{template.items.length} locaties</small>
+                  <button className="ghost-button" disabled={sourceLoading} onClick={() => void useStandardSet(template)} aria-label={`Gebruik ${template.name}`}>Gebruik deze set →</button>
+                </article>)}
+              </div>
+              <p className="library-note">Je krijgt een eigen kopie die je kunt aanpassen. De standaardset blijft beschikbaar.</p>
+            </details>
           </section>
           <div className="workspace">
             <aside className="card builder">
@@ -398,24 +480,10 @@ export default function App() {
                   setSet((s) => ({ ...s, name: e.target.value }))
                 }
               />
+              <p className="library-note">Wijzigingen worden automatisch in deze set opgeslagen.</p>
               <div className="set-actions">
-                <button
-                  disabled={sourceLoading}
-                  onClick={() => void loadDefaultSet()}
-                >
-                  Standaard Europa laden
-                </button>
-                <button
-                  disabled={sourceLoading}
-                  onClick={() => {
-                    setCandidate(null);
-                    setSet({ version: 1, name: "Mijn oefenset", items: [] });
-
-                    setError("");
-                  }}
-                >
-                  Lege set
-                </button>
+                <button disabled={sourceLoading} onClick={() => addSavedSet({ ...set, name: `${set.name.slice(0, 110)} (kopie)` })}>Set kopiëren</button>
+                <button disabled={sourceLoading} onClick={() => setDeleteId(set.id)}>Set verwijderen</button>
               </div>
               <div className="selected-header">
                 <h3>Geselecteerde locaties</h3>
@@ -796,104 +864,27 @@ export default function App() {
             />
           </div>
           <section className="play-layout">
-            <aside className="card question-card">
-              <p className="eyebrow">
-                {categoryLabels[current.item.categorie]} · VRAAG {index + 1}
-              </p>
-              <h2>
-                {mode === "zoek-op-kaart" ? "Zoek op kaart" : "Wat is dit?"}
-              </h2>
-              {mode === "zoek-op-kaart" ? (
-                <h1 className="question-name">{current.item.naam}</h1>
-              ) : (
-                <p className="question-description">
-                  Welke naam hoort bij de oranje markering?
-                </p>
-              )}
-              <p className="instruction">
+            <div className="card play-question">
+              <div className="play-prompt">
+                <p className="eyebrow">{categoryLabels[current.item.categorie]} · {mode === "zoek-op-kaart" ? "ZOEK OP KAART" : "WAT IS DIT?"}</p>
                 {mode === "zoek-op-kaart"
-                  ? "Klik op het juiste punt, de lijn of het land. Je kunt inzoomen voor meer ruimte."
-                  : "Kies je antwoord. Je kunt ook de toetsen 1 tot en met 4 gebruiken."}
-              </p>
-              {current.item.approximate && (
-                <p className="approximate-note">
-                  Deze locatie heeft geen passende brongeometrie.
-                </p>
-              )}
-              {mode === "wat-is-dit" && (
-                <div className="choices" aria-label="Antwoordopties">
-                  {current.opties.map((o, n) => (
-                    <button
-                      key={o.id}
-                      className={`choice-button ${feedback && o.id === current.item.id ? "correct" : feedback?.chosen?.id === o.id ? "wrong" : ""}`}
-                      disabled={!!feedback}
-                      onClick={() => answer(o)}
-                    >
-                      <span>{n + 1}.</span>
-                      {o.naam}
-                    </button>
-                  ))}
+                  ? <h1 className="question-name">{current.item.naam}</h1>
+                  : <h1 className="question-name">Welke locatie is dit?</h1>}
+              </div>
+              <details className="play-help">
+                <summary>Hulp</summary>
+                <div>
+                  <p>{mode === "zoek-op-kaart" ? "Klik of tik op het juiste punt, de lijn of het land." : "Kies een antwoord hieronder. De toetsen 1 tot en met 4 werken ook."}</p>
+                  <p>Sleep om de kaart te verschuiven. Ctrl/⌘ + muiswiel zoomt bij je cursor. Op je telefoon kun je knijpen om te zoomen.</p>
+                  <p>Klikpunten liggen soms iets uit elkaar; een lijntje wijst naar de echte plek. Een klein rondje helpt je om een klein land aan te klikken.</p>
+                  <small>{current.item.provenance?.provider} · {current.item.provenance?.version}</small>
                 </div>
-              )}
-              <p className="source-note">
-                {current.item.provenance?.provider} ·{" "}
-                {current.item.provenance?.version} ·{" "}
-                {current.item.provenance?.vertices.toLocaleString("nl-NL")}{" "}
-                bronpunten
-              </p>
-              <div aria-live="polite">
-                {feedback ? (
-                  <div
-                    className={`feedback-box ${feedback.correct ? "ok" : "wrong"}`}
-                  >
-                    <strong>
-                      {feedback.correct
-                        ? "Goed gevonden!"
-                        : `Het is ${current.item.naam}.`}
-                    </strong>
-                    {feedback.chosen && !feedback.correct && (
-                      <p>Jij koos {feedback.chosen.naam}.</p>
-                    )}
-                    <p>{current.item.hint}</p>
-                    <button className="cta-button" onClick={next}>
-                      {index === questions.length - 1
-                        ? "Bekijk eindscore"
-                        : "Volgende vraag"}{" "}
-                      →
-                    </button>
-                    <small>{feedback.correct
-                      ? "Klik of tik ergens om verder te gaan · Enter kan ook"
-                      : "Enter om verder te gaan"}</small>
-                  </div>
-                ) : (
-                  <button className="text-button skip" onClick={() => answer()}>
-                    Ik weet het nog niet →
-                  </button>
-                )}
-              </div>
-              <div className="score-strip">
-                <span>
-                  <strong>{score}</strong> goed
-                </span>
-                <span>
-                  <strong>{answers.length}</strong> beantwoord
-                </span>
-              </div>
-            </aside>
+              </details>
+            </div>
             <div className="card play-map">
-              <div className="play-map-heading">
-                <span>
-                  {symbols[current.item.categorie]}{" "}
-                  {categoryLabels[current.item.categorie]}
-                </span>
-                <span>
-                  {mode === "wat-is-dit"
-                    ? "Oranje = gevraagde locatie"
-                    : "Alleen deze categorie is zichtbaar"}
-                </span>
-              </div>
               <TopoMap
                 items={mapItems}
+                fillContainer
                 resetKey={index}
                 category={current.item.categorie}
                 interactive={mode === "zoek-op-kaart" && !feedback}
@@ -915,9 +906,30 @@ export default function App() {
                   ? "Klik of tik op de kaart voor je eindscore"
                   : "Klik of tik op de kaart om verder te gaan"}
                 onTargetClick={(ids) =>
-                  answer(mapItems.find((i) => i.targetId === ids[0]))
+                  answer(mapItems.find((i) => i.targetId === (ids.includes(current.item.targetId) ? current.item.targetId : ids[0])))
                 }
               />
+            </div>
+            <div className={`play-answer-area ${mode === "wat-is-dit" ? "has-choices" : ""}`} aria-live="polite">
+              {feedback ? <div className={`feedback-box ${feedback.correct ? "ok" : "wrong"}`}>
+                <div className="feedback-summary">
+                  <strong>{feedback.correct ? "Goed gevonden!" : `Het is ${current.item.naam}.`}</strong>
+                  {feedback.chosen && !feedback.correct && <span>Jij koos {feedback.chosen.naam}.</span>}
+                  {feedback.correct && feedback.chosen && feedback.chosen.id !== current.item.id && <span>Deze plek telt voor Rome én Vaticaanstad.</span>}
+                  <details><summary>Meer uitleg</summary><p>{current.item.hint}</p></details>
+                </div>
+                <button className="cta-button" onClick={next}>{index === questions.length - 1 ? "Bekijk eindscore" : "Volgende vraag"} →</button>
+              </div> : <div className="play-answer-content">
+                {mode === "wat-is-dit" && <div className="choices" aria-label="Antwoordopties">
+                  {current.opties.map((option, n) => <button key={option.id} className="choice-button" onClick={() => answer(option)}>
+                    <span>{n + 1}.</span>{option.naam}
+                  </button>)}
+                </div>}
+                <div className="play-answer-footer">
+                  <span><strong>{score}</strong> goed · {answers.length} beantwoord</span>
+                  <button className="text-button skip" onClick={() => answer()}>Ik weet het nog niet →</button>
+                </div>
+              </div>}
             </div>
           </section>
         </>
@@ -1051,7 +1063,7 @@ export default function App() {
       </details>
       <footer>
         <span>topo. · Blijf nieuwsgierig.</span>
-        <span>Geen account nodig. Je oefenset blijft in deze browser.</span>
+        <span>Geen account nodig. Je oefensets blijven in deze browser.</span>
       </footer>
     </main>
   );

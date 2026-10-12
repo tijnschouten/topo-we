@@ -23,10 +23,11 @@ export function buildMultipleChoiceOptions(
   count = 4,
   random: () => number = Math.random
 ): TopoItem[] {
-  const sameCategory = pool.filter(
-    (item) => item.id !== correct.id && item.categorie === correct.categorie
-  );
-  const fallback = pool.filter((item) => item.id !== correct.id && item.categorie !== correct.categorie);
+  // A shared map point cannot distinguish these names in a multiple-choice
+  // question, so do not offer the other name as a distractor.
+  const distractorPool = pool.filter(item => !isCorrectAnswer(correct, item, "zoek-op-kaart"));
+  const sameCategory = distractorPool.filter(item => item.categorie === correct.categorie);
+  const fallback = distractorPool.filter(item => item.categorie !== correct.categorie);
   const distractors = shuffle([...sameCategory, ...fallback], random).slice(0, Math.max(0, count - 1));
   return shuffle([correct, ...distractors], random);
 }
@@ -79,4 +80,19 @@ export function loadBestScore(): number {
   const raw = localStorage.getItem(BEST_SCORE_KEY);
   const num = raw ? Number(raw) : 0;
   return Number.isFinite(num) ? num : 0;
+}
+
+// Rome and Vatican City share an acceptable location for a regional map quiz.
+// Use stable source identities rather than granting equivalence to arbitrary
+// close-together cities or user-supplied names.
+export function isRomeOrVaticanCity(item: TopoItem): boolean {
+  return item.categorie === "plaats" && (
+    ["Q220", "Q237"].includes(item.wikidataId ?? "") ||
+    ["ne-city-1159151593", "ne-city-1159127243"].includes(item.id)
+  );
+}
+export function isCorrectAnswer(correct: TopoItem, chosen: TopoItem | undefined, mode: QuizMode): boolean {
+  if (!chosen) return false;
+  return chosen.id === correct.id || (mode === "zoek-op-kaart" &&
+    isRomeOrVaticanCity(correct) && isRomeOrVaticanCity(chosen));
 }

@@ -10,8 +10,10 @@ import userEvent from "@testing-library/user-event";
 import App from "../App";
 import { mockSourceFiles } from "./sourceFixtures";
 import { initialItems } from "../data/catalog";
+import smallTargets from "./smallTargetFixtures.json";
+import type { TopoItem } from "../types";
 import europaSet from "../data/europaSet.json";
-import { saveSet, loadSet } from "../utils/sets";
+import { saveSet, loadSet, loadCollection } from "../utils/sets";
 import { createSetLink } from "../utils/shareSet";
 
 beforeEach(() => {
@@ -33,16 +35,94 @@ describe("App flow", () => {
     const user = userEvent.setup();
     const { container } = render(<App />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
-    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Europa");
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Groep 7 - Oktober - Europa");
     await waitFor(() => expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id)));
     expect(container.querySelectorAll(".selected-list li, .selected-list .selected-item")).toHaveLength(54);
-    await user.click(screen.getByRole("button", { name: "Lege set" }));
-    await user.click(screen.getByRole("button", { name: "Standaard Europa laden" }));
+    await user.click(screen.getByRole("button", { name: /Nieuwe oefenset/ }));
+    await user.click(screen.getByRole("button", { name: "Gebruik Groep 7 - Oktober - Europa" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
     await waitFor(() => {
-      expect(loadSet()?.name).toBe("Europa");
+      expect(loadSet()?.name).toBe("Groep 7 - Oktober - Europa");
       expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
     });
+  });
+  it("maakt, kopieert en wisselt sets zonder de oorspronkelijke set te verliezen", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: /Nieuwe oefenset/ }));
+    await user.clear(screen.getByLabelText("Naam van je set"));
+    await user.type(screen.getByLabelText("Naam van je set"), "November");
+    await user.click(screen.getByRole("button", { name: "Set kopiëren" }));
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("November (kopie)");
+    expect(loadCollection({ version: 1, name: "Fallback", items: [] }).sets).toHaveLength(3);
+    await user.click(screen.getByRole("button", { name: /Eigen set Steden oefenen/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Steden oefenen");
+    expect(loadSet()?.items).toHaveLength(2);
+    unmount();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Steden oefenen");
+    expect(screen.getByRole("button", { name: /November \(kopie\)/ })).toBeInTheDocument();
+  });
+  it("opent een standaardset als eigen kopie en verwijdert alleen de gekozen set", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Gebruik Europese landen + hoofdsteden" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    expect(loadSet()?.items).toHaveLength(90);
+    await user.click(screen.getByRole("button", { name: "Set verwijderen" }));
+    await user.click(screen.getByRole("button", { name: "Annuleren" }));
+    expect(loadSet()?.items).toHaveLength(90);
+    await user.click(screen.getByRole("button", { name: "Set verwijderen" }));
+    await user.click(screen.getByRole("button", { name: "Ja, set verwijderen" }));
+    await waitFor(() => expect(screen.getByLabelText("Naam van je set")).toHaveValue("Steden oefenen"));
+    expect(loadCollection({ version: 1, name: "Fallback", items: [] }).sets).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Gebruik Europese landen + hoofdsteden" })).toBeInTheDocument();
+  });
+  it("voegt een geïmporteerde set toe en laat zoeken in eigen sets", async () => {
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    const imported = { version: 1, name: "December", items: [initialItems.find(i => i.targetId === "plaats-parijs")!] };
+    fireEvent.change(container.querySelector('input[type="file"]')!, { target: { files: [{ size: 1000, text: async () => JSON.stringify(imported) }] } });
+    await waitFor(() => expect(screen.getByLabelText("Naam van je set")).toHaveValue("December"));
+    expect(loadCollection({ version: 1, name: "Fallback", items: [] }).sets).toHaveLength(2);
+    await user.type(screen.getByLabelText("Zoek oefensets"), "steden");
+    expect(screen.getByRole("button", { name: /Eigen set Steden oefenen/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Geselecteerd December/ })).not.toBeInTheDocument();
+    await user.clear(screen.getByLabelText("Zoek oefensets"));
+    expect(screen.getByRole("button", { name: /Geselecteerd December/ })).toBeInTheDocument();
+  });
+  it("houdt een lege bewerkbare set over na verwijderen van de laatste set", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Set verwijderen" }));
+    await user.click(screen.getByRole("button", { name: "Ja, set verwijderen" }));
+    expect(screen.getByLabelText("Naam van je set")).toHaveValue("Mijn oefenset");
+    expect(loadSet()?.items).toHaveLength(0);
+    expect(loadCollection({ version: 1, name: "Fallback", items: [] }).sets).toHaveLength(1);
+  });
+  it("rekent Rome en Vaticaanstad over en weer goed zonder een naamkeuze", async () => {
+    const { rome, vatican } = smallTargets as unknown as Record<string, TopoItem>;
+    saveSet({ version: 1, name: "Rome en Vaticaanstad", items: [rome, vatican] });
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
+    await user.click(screen.getByRole("button", { name: "Start oefenen" }));
+    for (let n = 0; n < 2; n++) {
+      const requested = container.querySelector(".question-name")!.textContent;
+      const other = requested === rome.naam ? vatican : rome;
+      fireEvent.keyDown(container.querySelector(`[data-target-ids~="${other.targetId}"]`)!, { key: "Enter" });
+      expect(screen.getByText("Goed gevonden!")).toBeInTheDocument();
+
+      expect(screen.queryByText("Welke locatie bedoel je?")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: n === 0 ? /Volgende vraag/ : /Bekijk eindscore/ }));
+    }
+    expect(screen.getByText("Je kent de weg!")).toBeInTheDocument();
   });
   it.each([false, true])("verwijdert achtergebleven objectfocus bij doorklikken op de kaart (ander object: %s)", async different => {
     const user = userEvent.setup();
@@ -80,6 +160,7 @@ describe("App flow", () => {
     await waitFor(() => expect(loadSet()?.name).toBe(incoming.name));
     expect(loadSet()?.items).toHaveLength(1);
     expect(window.location.hash).toBe("");
+    expect(loadCollection({ version: 1, name: "Fallback", items: [] }).sets).toHaveLength(2);
   });
   it("opent een link in de al geladen app en laat de eigen set behouden", async () => {
     const user = userEvent.setup();
@@ -223,7 +304,7 @@ describe("App flow", () => {
     );
     expect(loadSet()?.name).toBe("Mijn steden");
     expect(loadSet()?.items).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Lege set" }));
+    await user.click(screen.getByRole("button", { name: /Nieuwe oefenset/ }));
     expect(
       screen.getByRole("button", { name: "Start oefenen" }),
     ).toBeDisabled();

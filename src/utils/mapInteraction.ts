@@ -4,6 +4,34 @@ export interface MapPoint {
   y: number;
 }
 
+// Spread only crowded markers, preserving a leader back to each source position.
+// Sort by position and identity so layout never depends on SVG drawing order.
+export function separateMapPoints(points: MapPoint[], scale: number) {
+  const placed: MapPoint[] = [];
+  const gap = 26 * scale;
+  const ordered = [...points].sort((a, b) => a.x - b.x || a.y - b.y || a.id.localeCompare(b.id));
+  for (const point of ordered) {
+    const available = (candidate: MapPoint) => placed.every(other => Math.hypot(other.x - candidate.x, other.y - candidate.y) >= gap - 0.001);
+    if (available(point)) { placed.push(point); continue; }
+    const nearest = [...placed].sort((a, b) => Math.hypot(a.x - point.x, a.y - point.y) - Math.hypot(b.x - point.x, b.y - point.y))[0];
+    const direction = Math.atan2(point.y - nearest.y, point.x - nearest.x);
+    let candidate = point;
+    let found = false;
+    // Find the nearest free local position. Never merge a chain of nearby cities
+    // into one continent-sized cluster.
+    for (let ring = 1; !found; ring++) {
+      for (let step = 0; step < 24; step++) {
+        const angle = direction + step * Math.PI / 12;
+        candidate = { ...point, x: point.x + Math.cos(angle) * gap * ring,
+          y: point.y + Math.sin(angle) * gap * ring };
+        if (available(candidate)) { found = true; break; }
+      }
+    }
+    placed.push(candidate);
+  }
+  return placed;
+}
+
 // Overlapping hit circles must not make the SVG drawing order decide the answer.
 export function nearestPoint(points: MapPoint[], x: number, y: number, radius: number) {
   let best: MapPoint | undefined;
@@ -31,7 +59,7 @@ interface MapLabel extends MapPoint {
   required?: boolean;
 }
 
-export function layoutMapLabels(labels: MapLabel[], markers: MapPoint[], scale: number) {
+export function layoutMapLabels(labels: MapLabel[], markers: MapPoint[], scale: number, heightLimit = 680) {
   const occupied: Box[] = markers.map(p => ({
     x: p.x - 12 * scale, y: p.y - 12 * scale,
     width: 24 * scale, height: 24 * scale,
@@ -66,14 +94,14 @@ export function layoutMapLabels(labels: MapLabel[], markers: MapPoint[], scale: 
     for (const [x, y] of offsets) {
       const candidate = { x, y, width, height };
       if (x < 4 * scale || x + width > 1000 - 4 * scale ||
-          y < 4 * scale || y + height > 680 - 4 * scale) continue;
+          y < 4 * scale || y + height > heightLimit - 4 * scale) continue;
       if (!occupied.some(other => overlaps(candidate, other))) { box = candidate; break; }
     }
     if (!box && label.required) {
       // Keep feedback visible near the edge, even if surrounding markers are dense.
       for (const [x, y] of offsets) {
         const candidate = { x: Math.max(4 * scale, Math.min(x, 1000 - width - 4 * scale)),
-          y: Math.max(4 * scale, Math.min(y, 680 - height - 4 * scale)), width, height };
+          y: Math.max(4 * scale, Math.min(y, heightLimit - height - 4 * scale)), width, height };
         if (!placed.some(other => overlaps(candidate, other.box))) { box = candidate; break; }
       }
     }

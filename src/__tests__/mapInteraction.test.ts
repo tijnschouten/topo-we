@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layoutMapLabels, nearestPoint } from "../utils/mapInteraction";
+import { layoutMapLabels, nearestPoint, separateMapPoints } from "../utils/mapInteraction";
 
 describe("dichtbij gelegen steden", () => {
   const cities = [
@@ -53,3 +53,27 @@ describe("dichtbij gelegen steden", () => {
     expect(labels.some(p => p.id === "6")).toBe(true);
   });
 });
+
+ describe("uit elkaar geplaatste klikpunten", () => {
+  it("maakt zelfs identieke bronpunten apart bereikbaar, onafhankelijk van volgorde", () => {
+    const points = ["rome", "vaticaan", "derde"].map(id => ({ id, x: 500, y: 340 }));
+    const separated = separateMapPoints(points, 1);
+    expect(separateMapPoints([...points].reverse(), 1)).toEqual(separated);
+    for (const point of separated) {
+      expect(nearestPoint(separated, point.x, point.y, 23)).toBe(point.id);
+      for (const other of separated.filter(other => other.id !== point.id))
+        expect(Math.hypot(point.x - other.x, point.y - other.y)).toBeGreaterThanOrEqual(25.99);
+    }
+  });
+  it("verplaatst een lange keten van nabije steden alleen lokaal", () => {
+    const points = Array.from({ length: 20 }, (_, i) => ({ id: String(i), x: 200 + i * 20, y: 300 }));
+    for (const marker of separateMapPoints(points, 1)) {
+      const source = points.find(point => point.id === marker.id)!;
+      expect(Math.hypot(marker.x - source.x, marker.y - source.y)).toBeLessThanOrEqual(52.01);
+    }
+  });
+  it("behoudt de geografische positie wanneer inzoomen de punten voldoende scheidt", () => {
+    const points = [{ id: "a", x: 400, y: 300 }, { id: "b", x: 480, y: 300 }];
+    expect(separateMapPoints(points, 1)).toEqual(points);
+  });
+ });

@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TopoMap from "../components/TopoMap";
+import { svgPosition } from "../utils/mapGestures";
 import { initialItems } from "../data/catalog";
 
 const items = initialItems.filter(i => i.categorie === "plaats");
@@ -24,6 +25,26 @@ function transform(svg: Element) {
   return svg.querySelector("g[transform]")!.getAttribute("transform");
 }
 describe("kaartgebaren", () => {
+  it("past de projectie aan een portretkaart aan en behoudt de zoom bij een nieuwe hoogte", () => {
+    let resized: ResizeObserverCallback | undefined;
+    const originalObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) { resized = callback; }
+      observe() {} unobserve() {} disconnect() {}
+    } as typeof ResizeObserver;
+    try {
+      render(<TopoMap items={items} interactive={false} fillContainer />);
+      const svg = screen.getByLabelText("Oefenkaart") as unknown as SVGSVGElement;
+      fireEvent.click(screen.getByRole("button", { name: "Inzoomen" }));
+      vi.mocked(SVGSVGElement.prototype.getBoundingClientRect).mockReturnValue({
+        x: 0, y: 0, left: 0, top: 0, width: 400, height: 600, right: 400, bottom: 600, toJSON() {},
+      });
+      act(() => { resized!([], {} as ResizeObserver); });
+      expect(svg).toHaveAttribute("viewBox", "0 0 1000 1500");
+      expect(transform(svg)).toContain("scale(1.5)");
+      expect(svgPosition(svg, 200, 300)).toEqual({ x: 500, y: 750 });
+    } finally { globalThis.ResizeObserver = originalObserver; }
+  });
   it("toont bij fout antwoord een kaartknop met leespauze, zonder overal doorklikken", () => {
     vi.useFakeTimers();
     const next = vi.fn();
@@ -45,7 +66,35 @@ describe("kaartgebaren", () => {
     const svg = screen.getByLabelText("Oefenkaart");
     const pinch = dispatch(svg, "wheel", { deltaY: -Math.log(2) * 100, deltaMode: 0, ctrlKey: true, clientX: 250, clientY: 200 });
     expect(pinch.defaultPrevented).toBe(true);
-    expect(transform(svg)).toBe("translate(-250 -200) scale(2)");
+    dispatch(svg, "wheel", { deltaY: -Math.log(2) * 100, deltaMode: 0, ctrlKey: true, clientX: 250, clientY: 200 });
+    const values = transform(svg)!.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    expect(values[0]).toBeCloseTo(-250);
+    expect(values[1]).toBeCloseTo(-200);
+    expect(values[2]).toBeCloseTo(2);
+  });
+  it("zoomt beheerst met Ctrl of Command en laat veel verder inzoomen toe", () => {
+    render(<TopoMap items={items} interactive={false} />);
+    const svg = screen.getByLabelText("Oefenkaart");
+    dispatch(svg, "wheel", { deltaY: -100, deltaMode: 0, ctrlKey: true, clientX: 500, clientY: 340 });
+    expect(transform(svg)).toContain(`scale(${Math.exp(0.35)})`);
+    dispatch(svg, "wheel", { deltaY: -100, deltaMode: 0, metaKey: true, clientX: 500, clientY: 340 });
+    expect(transform(svg)).toContain(`scale(${Math.exp(0.35) ** 2})`);
+    for (let n = 0; n < 20; n++) fireEvent.click(screen.getByRole("button", { name: "Inzoomen" }));
+    expect(transform(svg)).toContain("scale(64)");
+    fireEvent.click(screen.getByRole("button", { name: "Kaart herstellen" }));
+    expect(transform(svg)).toBe("translate(0 0) scale(1)");
+  });
+  it("verschuift met de middelste muisknop zonder een antwoord te geven", () => {
+    const answer = vi.fn();
+    render(<TopoMap items={items} interactive onTargetClick={answer} />);
+    const svg = screen.getByLabelText("Oefenkaart");
+    const down = dispatch(svg, "pointerdown", { pointerId: 1, pointerType: "mouse", button: 1, clientX: 200, clientY: 300 });
+    dispatch(svg, "pointermove", { pointerId: 1, clientX: 260, clientY: 340 });
+    dispatch(svg, "pointerup", { pointerId: 1 });
+    fireEvent.click(svg);
+    expect(down.defaultPrevented).toBe(true);
+    expect(transform(svg)).toBe("translate(60 40) scale(1)");
+    expect(answer).not.toHaveBeenCalled();
   });
   it("pant met horizontale en verticale trackpadbeweging, ook ingezoomd, zonder antwoord", () => {
     const next = vi.fn(), answer = vi.fn();

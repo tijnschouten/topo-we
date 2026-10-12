@@ -1,0 +1,143 @@
+{
+  "rome": {
+    "id": "ne-city-1159151593",
+    "targetId": "ne-city-1159151593",
+    "naam": "Rome",
+    "categorie": "plaats",
+    "hint": "Italy · Lazio",
+    "source": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/",
+    "provenance": {
+      "provider": "Natural Earth",
+      "version": "5.1.2 / 1:10m",
+      "url": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/",
+      "recordId": "1159151593",
+      "vertices": 1,
+      "license": "Public domain",
+      "sha256": "9b8e3de09048ef00dfc70357dbb9fa324493f214b5e0ae4daf1aa79a8d10116b",
+      "file": "ne-city-1159151593.json.gz"
+    },
+    "approximate": false,
+    "countryCode": "ITA",
+    "countryName": "Italië",
+    "regionName": "Lazio",
+    "capital": true,
+    "continent": "Europe",
+    "wikidataId": "Q220",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        12.481313,
+        41.897902
+      ]
+    }
+  },
+  "vatican": {
+    "id": "ne-city-1159127243",
+    "targetId": "ne-city-1159127243",
+    "naam": "Vaticaanstad",
+    "categorie": "plaats",
+    "hint": "Vatican · Lazio",
+    "source": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/",
+    "provenance": {
+      "provider": "Natural Earth",
+      "version": "5.1.2 / 1:10m",
+      "url": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/",
+      "recordId": "1159127243",
+      "vertices": 1,
+      "license": "Public domain",
+      "sha256": "9b8e3de09048ef00dfc70357dbb9fa324493f214b5e0ae4daf1aa79a8d10116b",
+      "file": "ne-city-1159127243.json.gz"
+    },
+    "approximate": false,
+    "countryCode": "VAT",
+    "countryName": "Vaticaanstad",
+    "regionName": "Lazio",
+    "capital": true,
+    "continent": "Europe",
+    "wikidataId": "Q237",
+    "geometry": {
+      "type": "Point",
+      "coordinates": [
+        12.453387,
+        41.903282
+      ]
+    }
+  },
+  "monaco": {
+    "id": "ne-country-1159321043",
+    "targetId": "ne-country-1159321043",
+    "naam": "Monaco",
+    "categorie": "land",
+    "hint": "Monaco · landgrens uit Natural Earth",
+    "source": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/",
+    "provenance": {
+      "provider": "Natural Earth",
+      "version": "5.1.2 / 1:10m",
+      "url": "https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/",
+      "recordId": "1159321043",
+      "vertices": 12,
+      "license": "Public domain",
+      "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255",
+      "file": "ne-country-1159321043.json.gz"
+    },
+    "approximate": false,
+    "countryCode": "MCO",
+    "continent": "Europe",
+    "wikidataId": "Q235",
+    "geometry": {
+      "type": "Polygon",
+      "coordinates": [
+        [
+          [
+            7.437454,
+            43.743361
+          ],
+          [
+            7.432845,
+            43.739853
+          ],
+          [
+            7.417957,
+            43.730904
+          ],
+          [
+            7.404319,
+            43.717969
+          ],
+          [
+            7.380723,
+            43.719273
+          ],
+          [
+            7.36575,
+            43.72273
+          ],
+          [
+            7.367263,
+            43.734125
+          ],
+          [
+            7.372655,
+            43.745832
+          ],
+          [
+            7.387538,
+            43.757899
+          ],
+          [
+            7.406969,
+            43.763506
+          ],
+          [
+            7.426246,
+            43.755464
+          ],
+          [
+            7.437454,
+            43.743361
+          ]
+        ]
+      ]
+    }
+  }
+}

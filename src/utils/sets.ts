@@ -56,11 +56,63 @@ export function parseSet(raw: string): PracticeSet {
 }
 export function loadSet(): PracticeSet | null {
   try {
+    const collection = localStorage.getItem(collectionKey);
+    if (collection) {
+      const saved = parseCollection(collection);
+      return saved.sets.find(set => set.id === saved.activeId) ?? null;
+    }
     const raw = localStorage.getItem(key);
     return raw ? parseSet(raw) : null;
   } catch {
     return null;
   }
+}
+
+export interface SavedSet extends PracticeSet { id: string }
+export interface SetCollection {
+  version: 2;
+  activeId: string;
+  sets: SavedSet[];
+}
+const collectionKey = "topo-practice-sets-v2";
+export function newSavedSet(set: PracticeSet): SavedSet {
+  return { ...set, id: crypto.randomUUID() };
+}
+export function parseCollection(raw: string): SetCollection {
+  const data = JSON.parse(raw) as SetCollection;
+  if (!data || data.version !== 2 || !Array.isArray(data.sets) || !data.sets.length)
+    throw new Error("Geen geldige verzameling oefensets.");
+  const ids = new Set<string>();
+  for (const set of data.sets) {
+    if (typeof set.id !== "string" || !set.id || ids.has(set.id))
+      throw new Error("Oefensets moeten een unieke identiteit hebben.");
+    parseSet(JSON.stringify(set));
+    ids.add(set.id);
+  }
+  if (!ids.has(data.activeId)) throw new Error("De geselecteerde oefenset ontbreekt.");
+  return data;
+}
+export function loadCollection(fallback: PracticeSet): SetCollection {
+  try {
+    const raw = localStorage.getItem(collectionKey);
+    if (raw) return parseCollection(raw);
+  } catch { /* Recover the previous single set when possible. */ }
+  let legacy: PracticeSet | null = null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) legacy = parseSet(raw);
+  } catch { /* Use the built-in set on first use or invalid legacy data. */ }
+  const set = newSavedSet(legacy ?? fallback);
+  return { version: 2, activeId: set.id, sets: [set] };
+}
+export function saveCollection(collection: SetCollection): boolean {
+  try {
+    localStorage.setItem(collectionKey, JSON.stringify({
+      ...collection,
+      sets: collection.sets.map(set => portableSet({ ...set, name: set.name.trim() || "Mijn oefenset" })),
+    }));
+    return true;
+  } catch { return false; }
 }
 export function saveSet(set: PracticeSet): boolean {
   try {

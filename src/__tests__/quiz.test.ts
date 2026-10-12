@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import smallTargets from "./smallTargetFixtures.json";
+import type { TopoItem } from "../types";
 import { topoItems } from "../data/topoItems";
 import {
   buildMultipleChoiceOptions,
   buildQuestions,
+  isCorrectAnswer,
   calculateScore,
   calculateStreak,
   filterItemsByCategory,
@@ -39,5 +42,29 @@ describe("quiz helpers", () => {
     const unique = new Set(options.map((item) => item.id));
     expect(unique.size).toBe(4);
     expect(options.filter((item) => item.id === correct.id)).toHaveLength(1);
+  });
+});
+
+describe("Rome en Vaticaanstad op de kaart", () => {
+  const { rome, vatican, monaco } = smallTargets as unknown as Record<string, TopoItem>;
+  it.each([[rome, vatican], [vatican, rome]])("accepteert beide stadsmarkeringen bij een kaartvraag", (requested, chosen) => {
+    expect(isCorrectAnswer(requested, chosen, "zoek-op-kaart")).toBe(true);
+    expect(isCorrectAnswer(requested, requested, "zoek-op-kaart")).toBe(true);
+    expect(isCorrectAnswer(requested, chosen, "wat-is-dit")).toBe(false);
+    expect(isCorrectAnswer(requested, requested, "wat-is-dit")).toBe(true);
+  });
+  it("biedt de andere naam van het gedeelde punt niet als meerkeuze-afleider aan", () => {
+    for (const correct of [rome, vatican]) {
+      const other = correct.id === rome.id ? vatican : rome;
+      const options = buildMultipleChoiceOptions(correct, [rome, vatican, monaco], 4, () => 0.5);
+      expect(options).toContain(correct);
+      expect(options).not.toContain(other);
+    }
+  });
+  it("blijft andere locaties, ontbrekende antwoorden en een gelijknamig land weigeren", () => {
+    expect(isCorrectAnswer(rome, undefined, "zoek-op-kaart")).toBe(false);
+    expect(isCorrectAnswer(rome, monaco, "zoek-op-kaart")).toBe(false);
+    expect(isCorrectAnswer(rome, { ...vatican, id: "country-vatican", categorie: "land" }, "zoek-op-kaart")).toBe(false);
+    expect(isCorrectAnswer(rome, { ...vatican, id: "custom", wikidataId: undefined }, "zoek-op-kaart")).toBe(false);
   });
 });

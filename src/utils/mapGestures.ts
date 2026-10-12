@@ -8,16 +8,18 @@ export function svgPosition(svg: SVGSVGElement, clientX: number, clientY: number
   if (matrix) return new DOMPoint(clientX, clientY).matrixTransform(matrix.inverse());
   const rect = svg.getBoundingClientRect();
   if (!rect.width) return undefined;
-  const scale = Math.min(rect.width / 1000, rect.height / 680);
+  const dimensions = svg.getAttribute("viewBox")?.split(/\s+/).map(Number);
+  const width = dimensions?.[2] || 1000, height = dimensions?.[3] || 680;
+  const scale = Math.min(rect.width / width, rect.height / height);
   return {
-    x: (clientX - rect.left - (rect.width - 1000 * scale) / 2) / scale,
-    y: (clientY - rect.top - (rect.height - 680 * scale) / 2) / scale,
+    x: (clientX - rect.left - (rect.width - width * scale) / 2) / scale,
+    y: (clientY - rect.top - (rect.height - height * scale) / 2) / scale,
   };
 }
 
 // Keep the same geographic position under the cursor / midpoint of the fingers.
 export function zoomMap(view: MapView, factor: number, anchor: Position, destination = anchor): MapView {
-  const k = Math.min(12, Math.max(1, view.k * factor));
+  const k = Math.min(64, Math.max(1, view.k * factor));
   const ratio = k / view.k;
   return { k, x: destination.x - (anchor.x - view.x) * ratio,
     y: destination.y - (anchor.y - view.y) * ratio };
@@ -51,7 +53,8 @@ export function useMapGestures(
       suppressClick.current = true;
     };
     const down = (e: PointerEvent) => {
-      if (e.button !== 0) return;
+      if (e.button !== 0 && e.button !== 1) return;
+      if (e.button === 1) e.preventDefault();
       if (!pointers.size) suppressClick.current = false;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       // Keep the original path as the target for a simple tap on a country.
@@ -91,7 +94,7 @@ export function useMapGestures(
       e.preventDefault();
       if (gesture) return;
       const units = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 680 : 1;
-      if (!e.ctrlKey) {
+      if (!e.ctrlKey && !e.metaKey) {
         // Trackpad two-finger movement arrives as horizontal/vertical wheel
         // deltas. Convert screen pixels to SVG units, independent of map zoom.
         const start = svgPosition(element, 0, 0);
@@ -102,7 +105,7 @@ export function useMapGestures(
       }
       const anchor = svgPosition(element, e.clientX, e.clientY);
       const delta = e.deltaY * units;
-      if (anchor) setView(v => zoomMap(v, Math.exp(-delta * 0.01), anchor));
+      if (anchor) setView(v => zoomMap(v, Math.exp(Math.max(-0.35, Math.min(0.35, -delta * 0.005))), anchor));
     };
     // Safari on Mac uses WebKit gesture events instead of ctrl+wheel.
     type Gesture = Event & { scale: number; clientX: number; clientY: number };

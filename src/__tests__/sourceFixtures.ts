@@ -1,6 +1,9 @@
 import { vi } from "vitest";
 import { catalog, initialItems } from "../data/catalog";
-const sourceItems = catalog.map(item => item.geometry ? item : {
+import europeanItems from "../data/europeCountries.json";
+import type { TopoItem } from "../types";
+const fullCatalog = [...catalog, ...(europeanItems as TopoItem[]).filter(item => !catalog.some(existing => existing.id === item.id))];
+const sourceItems = fullCatalog.map(item => item.geometry ? item : {
   ...item,
   geometry: initialItems.find(example => example.categorie === item.categorie)!.geometry,
 });
