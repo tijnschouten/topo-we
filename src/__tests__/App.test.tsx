@@ -34,13 +34,15 @@ describe("App flow", () => {
     const { container } = render(<App />);
     await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
     expect(screen.getByLabelText("Naam van je set")).toHaveValue("Europa");
-    expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
+    await waitFor(() => expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id)));
     expect(container.querySelectorAll(".selected-list li, .selected-list .selected-item")).toHaveLength(54);
     await user.click(screen.getByRole("button", { name: "Lege set" }));
     await user.click(screen.getByRole("button", { name: "Standaard Europa laden" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Start oefenen" })).toBeEnabled());
-    expect(loadSet()?.name).toBe("Europa");
-    expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
+    await waitFor(() => {
+      expect(loadSet()?.name).toBe("Europa");
+      expect(loadSet()?.items.map(item => item.id)).toEqual(europaSet.items.map(item => item.id));
+    });
   });
   it.each([false, true])("verwijdert achtergebleven objectfocus bij doorklikken op de kaart (ander object: %s)", async different => {
     const user = userEvent.setup();
